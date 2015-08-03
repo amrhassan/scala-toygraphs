@@ -1,6 +1,7 @@
 package info.amrhassan.graphs
 
-import scala.collection.immutable.{Stack, Queue}
+import scala.collection.immutable.Queue
+import scala.collection.mutable
 
 /**
  * An immutable persistent Graph.
@@ -33,26 +34,30 @@ trait Graph[Vertex] {
   /**
    * Performs Breadth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
-  def bfs(start: Vertex)(callback: (Vertex) => Unit): Set[Vertex] = {
+  def bfs(start: Vertex)(onVisit: (Vertex, Option[Edge[Vertex]]) => Unit): Set[Vertex] = {
 
-    def bfs(explored: Set[Vertex], queue: Queue[Vertex]): Set[Vertex] = {
+    // The queue entry is made up of the vertex being explored and optionally the edge leading there. Only
+    // the source vertex would have no edge leading to it in the traversal.
+    type queueEntry = (Vertex, Option[Edge[Vertex]])
+
+    def bfs(explored: Set[Vertex], queue: Queue[queueEntry]): Set[Vertex] = {
       if (queue.isEmpty) {
         explored
       } else {
-        val (head, rest) = queue.dequeue
-        if (explored contains head)
+        val ((vertex, sourceEdge), rest) = queue.dequeue
+        if (explored contains vertex)
           bfs(explored, rest)
         else  {
-          callback(head)
-          val connectedVertices = edgesFrom(head) flatMap { edge =>
-            (edge.vertexSet - head).headOption filterNot explored.contains
+          onVisit(vertex, sourceEdge)
+          val connectedVertices = edgesFrom(vertex) flatMap { edge =>
+            (edge.vertexSet - vertex).headOption filterNot explored.contains map((_, Some(edge)))
           }
-          bfs(explored + head, rest ++ connectedVertices)
+          bfs(explored + vertex, rest ++ connectedVertices)
         }
       }
     }
 
-    bfs(Set.empty, Queue(start))
+    bfs(Set.empty, Queue((start, None)))
   }
 
   /**
@@ -77,5 +82,19 @@ trait Graph[Vertex] {
       }
     }
     dfs(Set.empty, List(start))
+  }
+
+  /**
+   * Computes and returns the minimum number of hops required to navigate from the first to the second vertex.
+   */
+  def shortestDistance(from: Vertex, to: Vertex): Int = {
+    val distances = mutable.Map.empty[Vertex, Double].withDefaultValue(Double.PositiveInfinity)
+    bfs(from) { (vertex, edgeOption) =>
+      if (edgeOption.isEmpty)
+        distances(vertex) = 0.0
+      else
+        distances(vertex) = distances(edgeOption.get.otherVertex(vertex).get) + 1
+    }
+    distances(to).toInt
   }
 }
