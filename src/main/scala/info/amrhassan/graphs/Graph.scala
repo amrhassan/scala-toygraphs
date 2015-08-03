@@ -63,25 +63,26 @@ trait Graph[Vertex] {
   /**
    * Performs Depth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
-  def dfs(start: Vertex)(callback: (Vertex) => Unit): Set[Vertex] = {
+  def dfs(start: Vertex)(onVisit: (Vertex) => Unit)(onFinishingNeighbours: (Vertex) => Unit): Set[Vertex] = {
 
-    def dfs(explored: Set[Vertex], queue: List[Vertex]): Set[Vertex] = {
-      if (queue.isEmpty) {
+    def dfs(explored: Set[Vertex], vertex: Vertex): Set[Vertex] = {
+      if (explored contains vertex) {
         explored
       } else {
-        val vertex :: rest = queue
-        if (explored contains vertex) {
-          dfs(explored, rest)
-        } else {
-          callback(vertex)
-          val connectedVertices = edgesFrom(vertex) flatMap { edge =>
-            (edge.vertexSet - vertex).headOption filterNot explored.contains
-          }
-          dfs(explored + vertex, connectedVertices.toList ::: rest)
+        onVisit(vertex)
+        var exploredInProgress = explored + vertex
+        val connectedVertices = edgesFrom(vertex) flatMap { edge =>
+          (edge.vertexSet - vertex).headOption filterNot explored.contains
         }
+        connectedVertices foreach { newVertex =>
+          exploredInProgress ++= dfs(exploredInProgress, newVertex)
+        }
+        onFinishingNeighbours(vertex)
+        exploredInProgress
       }
     }
-    dfs(Set.empty, List(start))
+
+    dfs(Set.empty, start)
   }
 
   /**
@@ -112,5 +113,19 @@ trait Graph[Vertex] {
     }
 
     connectedComponents(Set.empty, Set.empty)
+  }
+
+  /**
+   * Returns a topologically-ordered traversable of this acyclic directed graph.
+   */
+  lazy val topologicallyOrdered: Traversable[Vertex] = {
+    require(isDirected)
+    var orderedVertices: List[Vertex] = Nil
+    var explored = Set.empty[Vertex]
+
+    while (explored != vertices) {
+      explored ++= dfs(vertices.head)(_ => {})(finishedVertex => orderedVertices = finishedVertex :: orderedVertices)
+    }
+    orderedVertices
   }
 }
