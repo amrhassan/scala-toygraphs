@@ -69,11 +69,13 @@ trait Graph[Vertex] {
       if (explored contains vertex) {
         explored
       } else {
+        println(s"DFSing with vertex=$vertex explored=$explored")
         onVisit(vertex)
         var exploredInProgress = explored + vertex
         val connectedVertices = edgesFrom(vertex) flatMap { edge =>
           (edge.vertexSet - vertex).headOption filterNot explored.contains
         }
+        println(s"DFS: connectedVertices=$connectedVertices")
         connectedVertices foreach { newVertex =>
           exploredInProgress ++= dfs(exploredInProgress, newVertex)
         }
@@ -120,13 +122,21 @@ trait Graph[Vertex] {
    */
   lazy val topologicallyOrdered: Traversable[Vertex] = {
     require(isDirected)
-    var orderedVertices: List[Vertex] = Nil
-    var explored = Set.empty[Vertex]
 
-    while (explored != vertices) {
-      explored ++= dfs(vertices.head)(_ => {})(finishedVertex => orderedVertices = finishedVertex :: orderedVertices)
+    def order(exploredSoFar: Set[Vertex], currentOrder: List[Vertex]) : List[Vertex] = {
+      if (vertices == exploredSoFar) {
+        currentOrder
+      } else {
+        var newOrder = currentOrder
+        val newlyExplored = dfs((vertices -- exploredSoFar).head)(_ => {}){ finishedVertex =>
+          if (newOrder.isEmpty || finishedVertex != newOrder.head)
+            newOrder = finishedVertex :: newOrder
+        }
+        order(exploredSoFar ++ newlyExplored, newOrder)
+      }
     }
-    orderedVertices
+
+    order(Set.empty, Nil)
   }
 
   def areConnected(v1: Vertex, v2: Vertex): Boolean =
