@@ -99,7 +99,7 @@ trait Graph[Vertex] {
     distances(to).toInt
   }
 
-  def connectedComponents: Set[Set[Vertex]] = {
+  lazy val connectedComponents: Set[Set[Vertex]] = {
     require(!isDirected)
 
     def connectedComponents(exploredSoFar: Set[Vertex], discoveredSoFar: Set[Set[Vertex]]): Set[Set[Vertex]] = {
@@ -128,4 +128,7 @@ trait Graph[Vertex] {
     }
     orderedVertices
   }
+
+  def areConnected(v1: Vertex, v2: Vertex): Boolean =
+    bfs(v1){case _ =>} contains v2
 }
