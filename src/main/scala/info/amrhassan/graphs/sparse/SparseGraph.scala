@@ -5,9 +5,8 @@ import info.amrhassan.graphs.{Graph, Edge}
 case class SparseGraph[Vertex] private(isDirected: Boolean, vertices: Set[Vertex], edges: Traversable[Edge[Vertex]])
   extends Graph[Vertex] {
 
-  override def connect(v1: Vertex, v2: Vertex): Graph[Vertex] = {
+  override def connect(v1: Vertex, v2: Vertex): Graph[Vertex] =
     SparseGraph(isDirected, vertices + v1 + v2, edges ++ Seq(Edge(v1, v2)))
-  }
 
   override def edgesFrom(v: Vertex): Traversable[Edge[Vertex]] =
     if (isDirected)

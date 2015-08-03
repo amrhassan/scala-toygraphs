@@ -97,4 +97,20 @@ trait Graph[Vertex] {
     }
     distances(to).toInt
   }
+
+  def connectedComponents: Set[Set[Vertex]] = {
+    require(!isDirected)
+
+    def connectedComponents(exploredSoFar: Set[Vertex], discoveredSoFar: Set[Set[Vertex]]): Set[Set[Vertex]] = {
+      val unexplored = vertices -- exploredSoFar
+      if (unexplored.isEmpty) {
+        discoveredSoFar
+      } else {
+        val newConnectedComponent = bfs(unexplored.head){case (_, _) =>}
+        connectedComponents(exploredSoFar ++ newConnectedComponent, discoveredSoFar + newConnectedComponent)
+      }
+    }
+
+    connectedComponents(Set.empty, Set.empty)
+  }
 }
