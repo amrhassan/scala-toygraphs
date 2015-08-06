@@ -8,6 +8,7 @@ case class SparseGraph[Vertex] private(isDirected: Boolean, vertices: Set[Vertex
   override def connect(v1: Vertex, v2: Vertex): Graph[Vertex] =
     SparseGraph(isDirected, vertices + v1 + v2, edges ++ Seq(Edge(v1, v2)))
 
+  // TODO: Should execute in constant time
   override def edgesFrom(v: Vertex): Traversable[Edge[Vertex]] =
     if (isDirected)
       edges filter(e => e.from == v)

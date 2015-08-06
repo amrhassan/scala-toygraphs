@@ -14,5 +14,6 @@ case class Edge[Vertex](v1: Vertex, v2: Vertex) {
   /**
    * Returns the other vertex that's not the given one.
    */
-  def otherVertex(v: Vertex): Option[Vertex] = (vertexSet - v).headOption
+  def otherVertex(v: Vertex): Vertex =
+    if (v == v1) v2 else v1
 }
