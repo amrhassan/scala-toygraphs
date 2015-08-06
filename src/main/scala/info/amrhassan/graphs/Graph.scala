@@ -2,7 +2,6 @@ package info.amrhassan.graphs
 
 import scala.collection.mutable
 
-
 /**
  * An immutable persistent Graph.
  */
@@ -30,70 +29,38 @@ trait Graph[Vertex] {
    */
   def edgesFrom(v: Vertex): Traversable[Edge[Vertex]]
 
+  def edgesTo(v: Vertex): Traversable[Edge[Vertex]]
+
+  def neighboursOf(v: Vertex): Traversable[Vertex] =
+    edgesFrom(v) map (edge => edge.otherVertex(v))
+
+  def reverseNeighboursOf(v: Vertex): Traversable[Vertex] =
+    edgesTo(v) map (edge => edge.otherVertex(v))
+
   private[graphs] case class TraversalEntry(vertex: Vertex, leadingEdge: Option[Edge[Vertex]])
 
   /**
-   * This function should accept the old queue as a first argument and the newly discovered items to queue as the
-   * second argument.
+   * Performs Breadth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
-  private[graphs] type QueueCombiner = (List[TraversalEntry], List[TraversalEntry]) => List[TraversalEntry]
+  def bfs(start: Vertex, history: Set[Vertex] = Set.empty)(onVisit: (TraversalEntry) => Unit): Set[Vertex] = {
 
-  private[graphs] case class History(explored: Set[Vertex],
-                             private val doneExploringCallbacks: List[(Set[Vertex], () => Unit)]) {
-
-    def has(v: Vertex): Boolean = explored contains v
-
-    def +(entry: TraversalEntry): History = {
-
-      val updatedExplored = explored + entry.vertex
-
-      doneExploringCallbacks foreach { case (vertices, callback) =>
-        if (vertices subsetOf updatedExplored)
-          callback()
-      }
-
-      History(updatedExplored,
-        doneExploringCallbacks filterNot {case (vertices, _) => vertices subsetOf updatedExplored})
-    }
-
-    /**
-     * Registers a callback to be executed when done exploring this vertex.
-     */
-    def onDoneExploring(vertices: Set[Vertex], callback: () => Unit): History =
-      History(explored, (vertices, callback) :: doneExploringCallbacks)
-  }
-
-  private object History {
-    def apply(): History = History(Set.empty, List.empty)
-    def apply(explored: Set[Vertex]): History = History(explored, List.empty)
-  }
-
-  private def traverse(start: Vertex,
-                       onVisit: (TraversalEntry) => Unit,
-                       combineQueued: QueueCombiner,
-                       onFinishNeighbours: (Vertex) => Unit,
-                       previousHistory: History): History = {
-
-    def explore(entry: TraversalEntry, queued: List[TraversalEntry], history: History): History = {
-      if (history has entry.vertex) {
+    def explore(entry: TraversalEntry, queued: List[TraversalEntry], history: Set[Vertex]): Set[Vertex] = {
+      if (history contains entry.vertex) {
         if (queued.isEmpty)
           history
         else
           explore(queued.head, queued.tail, history)
       } else {
         onVisit(entry)
+        val updatedHistory = history + entry.vertex
 
         val outgoingEdges = edgesFrom(entry.vertex)
 
-        val neighbours = (outgoingEdges map (_.otherVertex(entry.vertex))).toSet
-
-        val newVertices = outgoingEdges map { edge =>
+        val newEntries = outgoingEdges map { edge =>
           TraversalEntry(edge.otherVertex(entry.vertex), Some(edge))
         }
 
-        val updatedQueue = combineQueued(queued, newVertices.toList)
-
-        val updatedHistory = history.onDoneExploring(neighbours, () => onFinishNeighbours(entry.vertex)) + entry
+        val updatedQueue = queued ++ newEntries.toList
 
         if (updatedQueue.isEmpty) {
           updatedHistory
@@ -103,24 +70,34 @@ trait Graph[Vertex] {
       }
     }
 
-    explore(TraversalEntry(start, None), List.empty, previousHistory)
+    explore(TraversalEntry(start, None), List.empty, history)
   }
 
-  /**
-   * Performs Breadth-first Search in the graph from the given vertex. Returns the set of explored vertices.
-   */
-  def bfs(start: Vertex, history: History = History())
-         (onVisit: (TraversalEntry) => Unit)
-         (onFinishNeighbours: (Vertex) => Unit): History =
-    traverse(start, onVisit, (oldQueue, newQueue) => oldQueue ++ newQueue, onFinishNeighbours, history)
 
   /**
    * Performs Depth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
-  def dfs(start: Vertex, history: History = History())
-         (onVisit: (TraversalEntry) => Unit)
-         (onFinishNeighbours: (Vertex) => Unit): History =
-    traverse(start, onVisit, (oldQueue, newQueue) => newQueue ++ oldQueue, onFinishNeighbours, history)
+  def dfs(start: Vertex, history: Set[Vertex] = Set.empty)
+         (onVisit: (Vertex) => Unit)
+         (onFinishNeighbours: (Vertex) => Unit): Set[Vertex] = {
+
+    val mutableHistory = mutable.Set.empty[Vertex] ++ history
+
+    def uglyDFS(v: Vertex): Unit = {
+      if (mutableHistory contains v)
+        return
+
+      mutableHistory += v
+      onVisit(v)
+
+      neighboursOf(v) foreach uglyDFS
+
+      onFinishNeighbours(v)
+    }
+
+    uglyDFS(start)
+    mutableHistory.toSet
+  }
 
   /**
    * Computes and returns the minimum number of hops required to navigate from the first to the second vertex.
@@ -131,7 +108,7 @@ trait Graph[Vertex] {
       case None => distances(vertex) = 0
       case Some(edge) => distances(vertex) = distances(edge otherVertex vertex) + 1
     }
-    }(_ => {})
+    }
     distances(to).toInt
   }
 
@@ -143,7 +120,7 @@ trait Graph[Vertex] {
       if (unexplored.isEmpty) {
         discoveredSoFar
       } else {
-        val newConnectedComponent = bfs(unexplored.head)(DoNothing)(DoNothing).explored
+        val newConnectedComponent = bfs(unexplored.head)(DoNothing)
         loop(exploredSoFar ++ newConnectedComponent, discoveredSoFar + newConnectedComponent)
       }
     }
@@ -157,21 +134,18 @@ trait Graph[Vertex] {
   lazy val topologicallyOrdered: Traversable[Vertex] = {
     require(isDirected)
 
-    def order(history: History, currentOrder: List[Vertex]) : List[Vertex] = {
-      val unexplored = vertices -- history.explored
+    val ordered = mutable.ListBuffer.empty[Vertex]
+    var history = Set.empty[Vertex]
 
-      if (unexplored.isEmpty) {
-        currentOrder
-      } else {
-        val newOrder = mutable.ListBuffer() ++ currentOrder
-        val updatedHistory = dfs(unexplored.head, history)(DoNothing)(finishedVertex => newOrder.prepend(finishedVertex))
-        order(updatedHistory, newOrder.toList)
+    while ((vertices -- history).nonEmpty) {
+      history = dfs((vertices -- history).head, history)(DoNothing) { finishedVertex =>
+        ordered.prepend(finishedVertex)
       }
     }
 
-    order(History(), Nil)
+    ordered.toSeq
   }
 
   def areConnected(v1: Vertex, v2: Vertex): Boolean =
-    bfs(v1)(DoNothing)(DoNothing).explored contains v2
+    bfs(v1)(DoNothing) contains v2
 }

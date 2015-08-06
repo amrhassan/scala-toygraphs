@@ -14,6 +14,14 @@ case class SparseGraph[Vertex] private(isDirected: Boolean, vertices: Set[Vertex
       edges filter(e => e.from == v)
     else
       edges filter(e => e.vertexSet contains v)
+
+
+  // TODO: Should execute in constant time
+  override def edgesTo(v: Vertex): Traversable[Edge[Vertex]] =
+    if (isDirected)
+      edges filter(e => e.to == v)
+    else
+      edges filter(e => e.vertexSet contains v)
 }
 
 object SparseGraph {
