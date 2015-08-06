@@ -78,8 +78,8 @@ trait Graph[Vertex] {
    * Performs Depth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
   def dfs(start: Vertex, history: Set[Vertex] = Set.empty, reverse: Boolean = false)
-         (onVisit: (Vertex) => Unit)
-         (onFinishNeighbours: (Vertex) => Unit): Set[Vertex] = {
+         (onVisit: (Vertex) => Unit = DoNothing)
+         (onFinishNeighbours: (Vertex) => Unit = DoNothing): Set[Vertex] = {
 
     val mutableHistory = mutable.Set.empty[Vertex] ++ history
 
@@ -132,14 +132,21 @@ trait Graph[Vertex] {
   /**
    * Returns a topologically-ordered traversable of this acyclic directed graph.
    */
-  lazy val topologicallyOrdered: Traversable[Vertex] = {
+  lazy val topologicallyOrdered: Traversable[Vertex] =
+    topologicallySort()
+
+  lazy val reverseTopologicallyOrdered: Traversable[Vertex] =
+    topologicallySort(reverse = true)
+
+
+  private def topologicallySort(reverse: Boolean = false): Traversable[Vertex] = {
     require(isDirected)
 
     val ordered = mutable.ListBuffer.empty[Vertex]
     var history = Set.empty[Vertex]
 
     while ((vertices -- history).nonEmpty) {
-      history = dfs((vertices -- history).head, history)(DoNothing) { finishedVertex =>
+      history = dfs((vertices -- history).head, history, reverse)(DoNothing) { finishedVertex =>
         ordered.prepend(finishedVertex)
       }
     }
@@ -147,6 +154,27 @@ trait Graph[Vertex] {
     ordered.toSeq
   }
 
+
+  lazy val stronglyConnectedComponents: Set[Set[Vertex]] = {
+    require(isDirected)
+
+    var order = reverseTopologicallyOrdered.toList
+    var history = Set.empty[Vertex]
+    var components = Set.empty[Set[Vertex]]
+
+    while((vertices -- history).nonEmpty) {
+      val updatedHistory = dfs(order.head, history)()()
+      components += (updatedHistory -- history)
+      history = updatedHistory
+      order = order dropWhile history.contains
+    }
+
+    components
+  }
+
+
   def areConnected(v1: Vertex, v2: Vertex): Boolean =
     bfs(v1)(DoNothing) contains v2
+
+
 }

@@ -76,4 +76,30 @@ class GraphTest extends org.scalatest.FunSuite {
       assert(order === List("m", "u"))
     }
   }
+
+  test("computing strongly connected components") {
+    var g: Graph[Int] = SparseGraph.emptyDirected[Int]
+
+    g = g.connect(7, 1)
+    g = g.connect(1, 4)
+    g = g.connect(4, 7)
+
+    g = g.connect(9, 7)
+
+    g = g.connect(9, 3)
+    g = g.connect(3, 6)
+    g = g.connect(6, 9)
+
+    g = g.connect(8, 6)
+
+    g = g.connect(2, 8)
+    g = g.connect(8, 5)
+    g = g.connect(5, 2)
+
+    assert(g.stronglyConnectedComponents === Set(
+      Set(1, 7, 4),
+      Set(9, 6, 3),
+      Set(8, 2, 5)
+    ))
+  }
 }
