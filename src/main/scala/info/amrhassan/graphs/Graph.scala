@@ -77,17 +77,18 @@ trait Graph[Vertex] {
   /**
    * Performs Depth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
-  def dfs(start: Vertex, history: Set[Vertex] = Set.empty, reverse: Boolean = false)
+  def dfs(start: Vertex, history: mutable.Set[Vertex] = mutable.Set.empty, reverse: Boolean = false)
          (onVisit: (Vertex) => Unit = DoNothing)
          (onFinishNeighbours: (Vertex) => Unit = DoNothing): Set[Vertex] = {
 
-    val mutableHistory = mutable.Set.empty[Vertex] ++ history
+    val explored = mutable.Set.empty[Vertex]
 
     def uglyDFS(v: Vertex): Unit = {
-      if (mutableHistory contains v)
+      if (history contains v)
         return
 
-      mutableHistory += v
+      history += v
+      explored += v
       onVisit(v)
 
       val neighbours = if (reverse) reverseNeighboursOf(v) else neighboursOf(v)
@@ -97,7 +98,7 @@ trait Graph[Vertex] {
     }
 
     uglyDFS(start)
-    mutableHistory.toSet
+    explored.toSet
   }
 
   /**
@@ -143,12 +144,14 @@ trait Graph[Vertex] {
     require(isDirected)
 
     val ordered = mutable.ListBuffer.empty[Vertex]
-    var history = Set.empty[Vertex]
+    val history = mutable.Set.empty[Vertex]
+    var unexplored: Set[Vertex] = vertices
 
-    while ((vertices -- history).nonEmpty) {
-      history = dfs((vertices -- history).head, history, reverse)(DoNothing) { finishedVertex =>
+    while (unexplored.nonEmpty) {
+      val discovered = dfs(unexplored.head, history, reverse)() { finishedVertex =>
         ordered.prepend(finishedVertex)
       }
+      unexplored --= discovered
     }
 
     ordered.toSeq
@@ -159,14 +162,15 @@ trait Graph[Vertex] {
     require(isDirected)
 
     var order = reverseTopologicallyOrdered.toList
-    var history = Set.empty[Vertex]
+    val history = mutable.Set.empty[Vertex]
     var components = Set.empty[Set[Vertex]]
+    var unexplored = vertices
 
-    while((vertices -- history).nonEmpty) {
-      val updatedHistory = dfs(order.head, history)()()
-      components += (updatedHistory -- history)
-      history = updatedHistory
+    while(unexplored.nonEmpty) {
+      val component = dfs(order.head, history)()()
+      components += component
       order = order dropWhile history.contains
+      unexplored --= component
     }
 
     components
