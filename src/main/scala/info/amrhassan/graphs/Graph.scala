@@ -77,7 +77,7 @@ trait Graph[Vertex] {
   /**
    * Performs Depth-first Search in the graph from the given vertex. Returns the set of explored vertices.
    */
-  def dfs(start: Vertex, history: Set[Vertex] = Set.empty)
+  def dfs(start: Vertex, history: Set[Vertex] = Set.empty, reverse: Boolean = false)
          (onVisit: (Vertex) => Unit)
          (onFinishNeighbours: (Vertex) => Unit): Set[Vertex] = {
 
@@ -90,7 +90,8 @@ trait Graph[Vertex] {
       mutableHistory += v
       onVisit(v)
 
-      neighboursOf(v) foreach uglyDFS
+      val neighbours = if (reverse) reverseNeighboursOf(v) else neighboursOf(v)
+      neighbours foreach uglyDFS
 
       onFinishNeighbours(v)
     }
