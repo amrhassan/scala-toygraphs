@@ -158,6 +158,9 @@ trait Graph[Vertex] {
   }
 
 
+  /**
+   * The strongly-connected components of this directed graph, using Kosaraju's two-pass algorithm.
+   */
   lazy val stronglyConnectedComponents: Set[Set[Vertex]] = {
     require(isDirected)
 
