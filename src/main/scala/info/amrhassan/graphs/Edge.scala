@@ -1,6 +1,6 @@
 package info.amrhassan.graphs
 
-case class Edge[Vertex](v1: Vertex, v2: Vertex) {
+case class Edge[Vertex](v1: Vertex, v2: Vertex, length: Double = 1.0) {
 
   val from = v1
 
